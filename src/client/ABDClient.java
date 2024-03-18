@@ -29,10 +29,7 @@ import pojos.RegisterContentPojo;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
@@ -59,7 +56,9 @@ public class ABDClient {
     * The writer ID is used to identify the client that wrote the content.
     * The writer ID is used to break ties when multiple contents have the same timestamp.
     */
-    private final int writerId;
+    private int writerId;
+
+    private int writerTimestamp = -1;
 
     /*
     * This constructor initializes the ABD client.
@@ -98,16 +97,19 @@ public class ABDClient {
     }
 
     /*
-    * This method is used to get the most updated content from a quorum of responses.
-    * The most updated content is the one with the highest timestamp.
-    * If there are multiple contents with the highest timestamp, the one with the lowest writer ID is chosen.
-    * If the quorum sizes are well-chosen, the no inconsistencies should arise between client reads.
-    */
+     * This method is used to get the most updated content from a quorum of responses.
+     * The most updated content is the one with the highest timestamp.
+     * If there are multiple contents with the highest timestamp, the one with the lowest writer ID is chosen.
+     * If the quorum sizes are well-chosen, the no inconsistencies should arise between client reads.
+     */
+    /*
     private RegisterContentPojo getMostUpdatedContent(Collection<RegisterContentPojo> quorumResponses) {
+
         int highestTimestamp = quorumResponses.stream()
                 .mapToInt(RegisterContentPojo::getTimestamp)
                 .max()
                 .orElseThrow(() -> new IllegalStateException("No timestamps received"));
+
         List<RegisterContentPojo> highestTimestampResponses = quorumResponses.stream()
                 .filter(response -> response.getTimestamp() == highestTimestamp)
                 .collect(Collectors.toList());
@@ -121,6 +123,23 @@ public class ABDClient {
                 .orElseThrow(() -> new IllegalStateException("No result found"));
     }
 
+     */
+
+    private RegisterContentPojo getMostUpdatedContent(Collection<RegisterContentPojo> quorumResponses) {
+        List<RegisterContentPojo> highestTimestampResponses = quorumResponses.stream()
+                .filter(response -> response.getTimestamp() == writerTimestamp)
+                .collect(Collectors.toList());
+        int lowestWriterId = highestTimestampResponses.stream()
+                .mapToInt(RegisterContentPojo::getId)
+                .min()
+                .orElseThrow(() -> new IllegalStateException("No writer IDs received"));
+        return highestTimestampResponses.stream()
+                .filter(response -> response.getId() == lowestWriterId)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No result found"));
+    }
+
+
     /*
     * This method is used to write to the distributed register.
     * The method issues a write request to a quorum of replicas.
@@ -132,7 +151,8 @@ public class ABDClient {
         logger.trace("Reading most updated timestamp");
         int timestamp = readMostUpdatedTimestamp();
         logger.trace("Most updated timestamp: {}", timestamp);
-        RegisterContentPojo content = new RegisterContentPojo(timestamp + 1, writerId, value);
+        this.writerTimestamp++;
+        RegisterContentPojo content = new RegisterContentPojo(writerTimestamp, writerId, value);
         broadcastWrite(content);
     }
 

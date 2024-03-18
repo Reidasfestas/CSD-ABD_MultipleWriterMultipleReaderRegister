@@ -1,8 +1,8 @@
 #!/bin/bash
 
-CORRECT_REPLICAS=4
-CRASH_REPLICAS=0
-BYZANTINE_REPLICAS=0
+CORRECT_REPLICAS=10
+CRASH_REPLICAS=1
+BYZANTINE_REPLICAS=2
 START_PORT=8080
 
 CURRENT_PORT=$START_PORT
@@ -27,7 +27,7 @@ do
     CURRENT_PORT=$(( CURRENT_PORT + 1 ))
 done
 
-for i in $(seq 1 BYZANTINE_REPLICAS)
+for i in $(seq 1 $BYZANTINE_REPLICAS)
 do
     CMD="java -jar target/registerReplica-jar-with-dependencies.jar $CURRENT_PORT 2 &"
     echo $CMD
